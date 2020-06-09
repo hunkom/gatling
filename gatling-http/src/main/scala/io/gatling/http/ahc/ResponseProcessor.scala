@@ -1,5 +1,5 @@
 /**
- * Copyright 2011-2018 GatlingCorp (http://gatling.io)
+ * Copyright 2011-2020 GatlingCorp (http://gatling.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,8 @@
 package io.gatling.http.ahc
 
 import scala.util.control.NonFatal
-
 import io.gatling.commons.stats.{ KO, OK, Status }
 import io.gatling.commons.util.ClockSingleton.nowMillis
-import io.gatling.commons.util.StringHelper.Eol
 import io.gatling.core.check.Check
 import io.gatling.core.config.GatlingConfiguration
 import io.gatling.core.session.Session
@@ -35,7 +33,8 @@ import io.gatling.http.request.ExtraInfo
 import io.gatling.http.response.Response
 import io.gatling.http.util.HttpHelper
 import io.gatling.http.util.HttpHelper.{ isCss, resolveFromUri }
-import io.gatling.http.util.HttpStringBuilder
+
+import scala.collection.JavaConverters._
 
 import akka.actor.{ ActorRefFactory, Props }
 import com.typesafe.scalalogging.StrictLogging
@@ -82,30 +81,67 @@ class ResponseProcessor(statsEngine: StatsEngine, httpEngine: HttpEngine, config
   ): Unit =
     if (!tx.silent) {
       val fullRequestName = tx.fullRequestName
-      def dump = {
-        // hack: pre-cache url because it would reset the StringBuilder
-        tx.request.ahcRequest.getUrl
+      var url = tx.request.ahcRequest.getUrl
+      if (url.isEmpty) {
+        url = "[]"
+      }
+      var method = tx.request.ahcRequest.getMethod
+      if (method.isEmpty) {
+        method = "[]"
+      }
+      val status_code = response.statusCode.get
+      val response_time = response.timings.responseTime
+      val build_id = System.getenv("build_id")
+      val lg_id = System.getenv("lg_id")
+      val user_id = tx.session.userId
+      val test_type = System.getenv("test_type")
+      val simulation_name = System.getenv("simulation_name")
+      val env = System.getenv("env")
+      val time = System.currentTimeMillis()
+      def comparison_dump = {
+        val comparison = stringBuilder
+        comparison.append(s"$time").append("\t").append(s"$lg_id").append("\t").append(s"$build_id").append("\t")
+        comparison.append(s"$user_id").append("\t").append(s"$test_type").append("\t").append(s"$simulation_name").append("\t")
+        comparison.append(s"$fullRequestName").append("\t").append(s"$response_time")
+        comparison.append("\t").append(s"$method").append("\t").append(s"$status")
+        comparison.append("\t").append(s"$status_code").append("\t").append(s"$env").append("\t").append("REQUEST")
+        comparison.toString
+      }
+
+      def error_dump = {
+        val headers = tx.request.ahcRequest.getHeaders.entries().toString.replaceAll("\t", "")
+        val query_params = tx.request.ahcRequest.getQueryParams
+        val form_params = tx.request.ahcRequest.getFormParams
+        var params = ""
+        if (!query_params.isEmpty) {
+          for (param <- query_params.asScala) {
+            params += param.getName + "=" + param.getValue + ";"
+          }
+        }
+        if (!form_params.isEmpty) {
+          for (param <- form_params.asScala) {
+            params += param.getName + "=" + param.getValue + ";"
+          }
+        }
+        val error_key = s"$fullRequestName" + s"_$method" + s"_$status_code"
+        var response_body = response.body.string.replaceAll("\n", "").replaceAll("\t", "")
+        if (response_body.isEmpty) {
+          response_body = "[]"
+        }
         val buff = stringBuilder
-        buff.append(Eol).append(">>>>>>>>>>>>>>>>>>>>>>>>>>").append(Eol)
-        buff.append("Request:").append(Eol).append(s"$fullRequestName: $status ${errorMessage.getOrElse("")}").append(Eol)
-        buff.append("=========================").append(Eol)
-        buff.append("Session:").append(Eol).append(tx.session).append(Eol)
-        buff.append("=========================").append(Eol)
-        buff.append("HTTP request:").append(Eol).appendRequest(tx.request.ahcRequest, response.nettyRequest, configuration.core.charset)
-        buff.append("=========================").append(Eol)
-        buff.append("HTTP response:").append(Eol).appendResponse(response).append(Eol)
-        buff.append("<<<<<<<<<<<<<<<<<<<<<<<<<")
+        buff.append(s"""Error key: $error_key""").append("\t").append(s"""Request name: $fullRequestName""").append("\t")
+        buff.append(s"""Method: $method""").append("\t").append(s"""Response code: $status_code""").append("\t")
+        buff.append(s"""URL: $url""").append("\t").append(s"""Error message: ${errorMessage.getOrElse("")}""").append("\t")
+        buff.append(s"""Request params: $params""").append("\t").append(s"""Headers: $headers""").append("\t")
+        buff.append(s"""Response body: ${response_body.replaceAll("\"", "").replaceAll("\'", "").replaceAll("'", "")}""")
+        buff.append("\t")
         buff.toString
       }
+      logger.trace(comparison_dump)
 
       if (status == KO) {
-        logger.warn(s"Request '$fullRequestName' failed: ${errorMessage.getOrElse("")}")
-        if (!ResponseProcessor.IsTraceEnabled) {
-          logger.debug(dump)
-        }
+        logger.error(error_dump)
       }
-
-      logger.trace(dump)
 
       val extraInfo: List[Any] = try {
         tx.request.config.extraInfoExtractor match {
@@ -114,7 +150,7 @@ class ResponseProcessor(statsEngine: StatsEngine, httpEngine: HttpEngine, config
         }
       } catch {
         case NonFatal(e) =>
-          logger.warn("Encountered error while extracting extra request info", e)
+          //logger.warn("Encountered error while extracting extra request info", e)
           Nil
       }
 
