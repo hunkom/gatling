@@ -61,9 +61,6 @@ class DefaultResponseProcessor(
     val sessionWithUpdatedStats = sessionProcessor.updateSessionCrashed(tx.currentSession, failure.startTimestamp, failure.endTimestamp)
     try {
       statsProcessor.reportStats(tx.fullRequestName, tx.request.clientRequest, sessionWithUpdatedStats, KO, failure, Some(failure.errorMessage))
-    } catch {
-      case NonFatal(t) =>
-        logger.error(s"ResponseProcessor crashed while handling failure $failure on session=${tx.currentSession} request=${tx.request.requestName}: ${tx.request.clientRequest}, forwarding", t)
     } finally {
       nextExecutor.executeNextOnCrash(sessionWithUpdatedStats, failure.endTimestamp)
     }
@@ -139,7 +136,6 @@ class DefaultResponseProcessor(
 
     } catch {
       case NonFatal(t) =>
-        logger.error(s"ResponseProcessor crashed while handling response ${response.status} on session=${tx.currentSession} request=${tx.request.requestName}: ${tx.request.clientRequest}, forwarding", t)
         Crash(t.detailedMessage)
     }
 }

@@ -26,8 +26,8 @@ import io.gatling.http.client.Request
 import io.gatling.http.response.{ HttpResult, Response }
 import io.gatling.http.util._
 import io.gatling.netty.util.ahc.StringBuilderPool
-
 import com.typesafe.scalalogging.StrictLogging
+import io.gatling.http.util.HttpHelper.isTxt
 
 sealed trait StatsProcessor {
   def reportStats(
@@ -65,7 +65,6 @@ class DefaultStatsProcessor(
     errorMessage:    Option[String]
   ): Unit = {
     logTx0(fullRequestName, request, session, status, result, errorMessage, charset)
-
     statsEngine.logResponse(
       session,
       fullRequestName,
@@ -89,7 +88,70 @@ class DefaultStatsProcessor(
     errorMessage:    Option[String] = None,
     charset:         Charset
   ): Unit = {
-    def dump = {
+    var response_object: Response = null
+    result match {
+      case response: Response => response_object = response
+      case _                  =>
+    }
+
+    var url = request.getUri.toUrl
+    if (url.isEmpty) {
+      url = "[]"
+    }
+    val method = request.getMethod
+    val status_code = response_object.status.code()
+    val response_time = result.endTimestamp - result.startTimestamp
+    val build_id = System.getenv("build_id")
+    val lg_id = System.getenv("lg_id")
+    val user_id = session.userId
+    val test_type = System.getenv("test_type")
+    val simulation_name = System.getenv("simulation_name")
+    val env = System.getenv("env")
+    val time = System.currentTimeMillis()
+    def comparison_dump = {
+      val comparison = StringBuilderPool.DEFAULT.get()
+      comparison.append(s"$time").append("\t").append(s"$lg_id").append("\t").append(s"$build_id").append("\t")
+      comparison.append(s"$user_id").append("\t").append(s"$test_type").append("\t").append(s"$simulation_name").append("\t")
+      comparison.append(s"$fullRequestName").append("\t").append(s"$response_time")
+      comparison.append("\t").append(s"$method").append("\t").append(s"$status")
+      comparison.append("\t").append(s"$status_code").append("\t").append(s"$env")
+      comparison.toString
+    }
+
+    def error_dump = {
+      val headers = request.getHeaders.entries().toString.replaceAll("\t", "")
+      var params = "["
+      val query_params = request.getUri.getQuery
+      if (query_params != null) {
+        params += query_params
+      }
+      params += "]"
+
+      val error_key = s"$fullRequestName" + s"_$method" + s"_$status_code"
+      var response_body = "[]"
+      if (response_object.hasResponseBody) {
+        if (isTxt(response_object.headers)) {
+          response_body = response_object.body.string.replaceAll("\n", "").replaceAll("\t", "")
+        } else {
+          response_body = "<<<BINARY CONTENT>>>"
+        }
+      }
+      val buff = StringBuilderPool.DEFAULT.get()
+      buff.append(s"""Error key: $error_key""").append("\t").append(s"""Request name: $fullRequestName""").append("\t")
+      buff.append(s"""Method: $method""").append("\t").append(s"""Response code: $status_code""").append("\t")
+      buff.append(s"""URL: $url""").append("\t").append(s"""Error message: ${errorMessage.getOrElse("")}""").append("\t")
+      buff.append(s"""Request params: $params""").append("\t").append(s"""Headers: $headers""").append("\t")
+      buff.append(s"""Response body: ${response_body.replaceAll("\"", "").replaceAll("\'", "").replaceAll("'", "")}""")
+      buff.append("\t")
+      buff.toString
+    }
+    logger.trace(comparison_dump)
+
+    if (status == KO) {
+      logger.error(error_dump)
+    }
+
+    /* def dump = {
       // hack: pre-cache url because it would reset the StringBuilder
       // FIXME isn't this url already built when sending the request?
       request.getUri.toUrl
@@ -117,6 +179,6 @@ class DefaultStatsProcessor(
       }
     }
 
-    logger.trace(dump)
+    logger.trace(dump) */
   }
 }
