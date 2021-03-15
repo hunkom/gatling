@@ -1,5 +1,5 @@
 /*
- * Copyright 2011-2019 GatlingCorp (https://gatling.io)
+ * Copyright 2011-2021 GatlingCorp (https://gatling.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,39 +31,39 @@ import io.gatling.http.util.HttpHelper.isTxt
 
 sealed trait StatsProcessor {
   def reportStats(
-    fullRequestName: String,
-    request:         Request,
-    session:         Session,
-    status:          Status,
-    result:          HttpResult,
-    errorMessage:    Option[String]
-  ): Unit
+                   fullRequestName: String,
+                   request:         Request,
+                   session:         Session,
+                   status:          Status,
+                   result:          HttpResult,
+                   errorMessage:    Option[String]
+                 ): Unit
 }
 
 object NoopStatsProcessor extends StatsProcessor {
   override def reportStats(
-    fullRequestName: String,
-    request:         Request,
-    session:         Session,
-    status:          Status,
-    result:          HttpResult,
-    errorMessage:    Option[String]
-  ): Unit = {}
+                            fullRequestName: String,
+                            request:         Request,
+                            session:         Session,
+                            status:          Status,
+                            result:          HttpResult,
+                            errorMessage:    Option[String]
+                          ): Unit = {}
 }
 
 class DefaultStatsProcessor(
-    charset:     Charset,
-    statsEngine: StatsEngine
-) extends StatsProcessor with StrictLogging {
+                             charset:     Charset,
+                             statsEngine: StatsEngine
+                           ) extends StatsProcessor with StrictLogging {
 
   override def reportStats(
-    fullRequestName: String,
-    request:         Request,
-    session:         Session,
-    status:          Status,
-    result:          HttpResult,
-    errorMessage:    Option[String]
-  ): Unit = {
+                            fullRequestName: String,
+                            request:         Request,
+                            session:         Session,
+                            status:          Status,
+                            result:          HttpResult,
+                            errorMessage:    Option[String]
+                          ): Unit = {
     logTx0(fullRequestName, request, session, status, result, errorMessage, charset)
     statsEngine.logResponse(
       session,
@@ -80,14 +80,14 @@ class DefaultStatsProcessor(
   }
 
   private def logTx0(
-    fullRequestName: String,
-    request:         Request,
-    session:         Session,
-    status:          Status,
-    result:          HttpResult,
-    errorMessage:    Option[String] = None,
-    charset:         Charset
-  ): Unit = {
+                      fullRequestName: String,
+                      request:         Request,
+                      session:         Session,
+                      status:          Status,
+                      result:          HttpResult,
+                      errorMessage:    Option[String] = None,
+                      charset:         Charset
+                    ): Unit = {
     var response_object: Response = null
     result match {
       case response: Response => response_object = response
@@ -110,11 +110,12 @@ class DefaultStatsProcessor(
     val time = System.currentTimeMillis()
     def comparison_dump = {
       val comparison = StringBuilderPool.DEFAULT.get()
-      comparison.append(s"$time").append("\t").append(s"$lg_id").append("\t").append(s"$build_id").append("\t")
-      comparison.append(s"$user_id").append("\t").append(s"$test_type").append("\t").append(s"$simulation_name").append("\t")
-      comparison.append(s"$fullRequestName").append("\t").append(s"$response_time")
-      comparison.append("\t").append(s"$method").append("\t").append(s"$status")
-      comparison.append("\t").append(s"$status_code").append("\t").append(s"$env")
+      comparison.append(s"$time").append("\t").append(s"$simulation_name").append("\t")
+      comparison.append(s"$fullRequestName").append("\t").append(s"$response_time").append("\t")
+      comparison.append(s"$method").append("\t").append(s"$status").append("\t")
+      comparison.append(s"$status_code").append("\t").append(s"$user_id").append("\t")
+      comparison.append(s"$env").append("\t").append(s"$test_type").append("\t")
+      comparison.append(s"$build_id").append("\t").append(s"$lg_id").append("\t")
       comparison.toString
     }
 
