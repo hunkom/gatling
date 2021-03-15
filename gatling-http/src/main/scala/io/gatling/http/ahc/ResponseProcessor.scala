@@ -1,5 +1,5 @@
 /**
- * Copyright 2011-2020 GatlingCorp (http://gatling.io)
+ * Copyright 2011-2021 GatlingCorp (http://gatling.io)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -74,11 +74,11 @@ class ResponseProcessor(statsEngine: StatsEngine, httpEngine: HttpEngine, config
     }
 
   private def logRequest(
-    tx:           HttpTx,
-    status:       Status,
-    response:     Response,
-    errorMessage: Option[String] = None
-  ): Unit =
+                          tx:           HttpTx,
+                          status:       Status,
+                          response:     Response,
+                          errorMessage: Option[String] = None
+                        ): Unit =
     if (!tx.silent) {
       val fullRequestName = tx.fullRequestName
       var url = tx.request.ahcRequest.getUrl
@@ -100,11 +100,12 @@ class ResponseProcessor(statsEngine: StatsEngine, httpEngine: HttpEngine, config
       val time = System.currentTimeMillis()
       def comparison_dump = {
         val comparison = stringBuilder
-        comparison.append(s"$time").append("\t").append(s"$lg_id").append("\t").append(s"$build_id").append("\t")
-        comparison.append(s"$user_id").append("\t").append(s"$test_type").append("\t").append(s"$simulation_name").append("\t")
-        comparison.append(s"$fullRequestName").append("\t").append(s"$response_time")
-        comparison.append("\t").append(s"$method").append("\t").append(s"$status")
-        comparison.append("\t").append(s"$status_code").append("\t").append(s"$env").append("\t").append("REQUEST")
+        comparison.append(s"$time").append("\t").append(s"$simulation_name").append("\t")
+        comparison.append(s"$fullRequestName").append("\t").append(s"$response_time").append("\t")
+        comparison.append(s"$method").append("\t").append(s"$status").append("\t")
+        comparison.append(s"$status_code").append("\t").append(s"$user_id").append("\t")
+        comparison.append(s"$env").append("\t").append(s"$test_type").append("\t")
+        comparison.append(s"$build_id").append("\t").append(s"$lg_id").append("\t")
         comparison.toString
       }
 
